@@ -673,6 +673,7 @@
   .fqask h2 { margin: 0; } .fqask p { margin: 0; } .fqask label { font-family: var(--hand); display: block; margin: .3rem 0 .2rem; }
   .fqask textarea { width: 100%; font: inherit; font-size: 1.05rem; padding: .6rem .8rem; border: 1.6px solid var(--ink); border-radius: 10px; background: #fff9ea; color: var(--ink); resize: vertical; }
   .pdh { font-family: var(--pinyon, var(--hand)); font-size: 2.4rem; margin: 0 0 .4rem; text-align: center; color: var(--pink); } .pdnote { text-align: center; font-size: 1.05rem; margin: .8rem 0; max-width: 32rem; margin-inline: auto; }
+  .adprog { overflow-x: auto; grid-column: 1 / -1; width: 100%; } .adprog table { border-collapse: collapse; width: 100%; } .adprog th, .adprog td { padding: .45rem .5rem; text-align: center; border-bottom: 1px solid #d8c9a3; } .adprog th { font-size: .8rem; vertical-align: bottom; } .adprog th small { display: block; font-weight: 400; opacity: .7; } .adprog td.gn { text-align: left; font-weight: 800; } .adprog td small { display: block; font-size: .7rem; opacity: .75; } .adprog .fs { font-size: .85rem; } .pcoin { display: inline-block; width: 2rem; height: 2rem; line-height: 2rem; border-radius: 50%; font-size: 1.1rem; border: 2px solid rgba(0,0,0,.25); } .pcoin.empty { border: 2px dashed #bfae85; background: transparent; } .pcoin.m-gold { background: radial-gradient(circle at 35% 30%, #ffe27a, #f5c518 55%, #c49100); } .pcoin.m-silver { background: radial-gradient(circle at 35% 30%, #fff, #dfe4ea 55%, #9ea9b7); } .pcoin.m-bronze { background: radial-gradient(circle at 35% 30%, #f6bd8a, #e09a5c 55%, #a15c29); }
   .adqs { margin: .35rem 0 0; font-size: .95rem; } .adqs ul { margin: .3rem 0 0; padding-left: 1.2rem; } .adrow { margin-top: .4rem; }
   .lzhand { position: absolute; left: 60px; bottom: 10px; width: 44px; height: 56px; pointer-events: none; z-index: 3; transform-origin: 18px 4px; }
   .lzhand svg { display: block; position: relative; z-index: 1; }
@@ -1492,12 +1493,13 @@ function adminRoom(code) {
   $('#adminCard').classList.add('wide');
   $('#adminCard').innerHTML = `<div class="adtop"><div class="adqr">${qrSvg(url)}</div><div class="adinfo"><div class="lbl">Raumcode</div><div class="bigcode">${esc(code)}</div><div class="adurl">${esc(url)}</div>
     <div class="rbtns"><button class="btn" id="adCopy">Link kopieren</button><button class="btn" id="adFull">QR groß</button></div></div></div>
-    <div class="rbtns adctl"><button class="btn primary" id="adAll">Alle Gruppen starten</button><button class="btn" id="adPause">Pause für alle</button><button class="btn" id="adAdd">+ Gruppe</button><button class="btn" id="adQs">Offene Fragen (PDF)</button><button class="btn" id="adReset">Raum zurücksetzen</button><button class="btn" id="adDel">Raum schließen</button><button class="btn" id="adLeave">Raum verlassen</button></div>
+    <div class="rbtns adctl"><button class="btn primary" id="adAll">Alle Gruppen starten</button><button class="btn" id="adPause">Pause für alle</button><button class="btn" id="adAdd">+ Gruppe</button><button class="btn" id="adProg">Fortschritt</button><button class="btn" id="adQs">Offene Fragen (PDF)</button><button class="btn" id="adReset">Raum zurücksetzen</button><button class="btn" id="adDel">Raum schließen</button><button class="btn" id="adLeave">Raum verlassen</button></div>
     <div id="adList" class="adlist"></div>`;
   const armed = {}; const arm = (id, txt, fn) => { const b = $('#' + id); b.onclick = () => { if (!armed[id]) { armed[id] = 1; const o = b.textContent; b.textContent = txt; setTimeout(() => { armed[id] = 0; b.textContent = o; }, 3500); return; } armed[id] = 0; fn(); }; };
   $('#adCopy').onclick = () => { try { navigator.clipboard.writeText(url); toast('Link kopiert.'); } catch (e) { toast(url); } };
   $('#adFull').onclick = () => { const o = $('#cfOv'); o.hidden = false; o.innerHTML = `<div class="rcard qrbig"><div class="adqr">${qrSvg(url)}</div><div class="bigcode">${esc(code)}</div><div class="adurl">${esc(url)}</div><div class="rbtns" style="justify-content:center"><button class="btn primary" id="qrX">Schließen</button></div></div>`; $('#qrX').onclick = () => { o.hidden = true; }; };
   $('#adAll').onclick = () => NB.update(`rooms/${code}/meta`, { startAll: Date.now() });
+  $('#adProg').onclick = () => { adProg = !adProg; renderAdminList(code); };
   $('#adQs').onclick = () => printDoc('Offene Fragen')(qsHtml(adminGroups()));
   $('#adPause').onclick = () => NB.update(`rooms/${code}/meta`, { paused: !(adminData && adminData.meta && adminData.meta.paused) });
   $('#adAdd').onclick = () => { const gs = (adminData && adminData.groups) || {}; const n = Math.max(0, ...Object.keys(gs).map(gIdx)) + 1; NB.set(`rooms/${code}/groups/g${n}`, { name: 'Gruppe ' + n }); };
@@ -1512,13 +1514,23 @@ function adminRoom(code) {
   if (adminUn) adminUn();
   adminUn = NB.on(`rooms/${code}`, 'value', snap => { adminData = snap; if (!snap) { leaveAdminRoom(); return; } renderAdminList(code); });
 }
-let adminData = null;
+let adminData = null, adProg = false;
 function leaveAdminRoom() { if (adminUn) { adminUn(); adminUn = null; } ssSet('zs-admin-room', null); $('#adminCard').classList.remove('wide'); adminHome(); }
 function renderAdminList(code) {
   const box = $('#adList'); if (!box || !adminData) return;
   const m = adminData.meta || {}; $('#adPause').textContent = m.paused ? 'Weiter für alle' : 'Pause für alle'; $('#adPause').classList.toggle('primary', !!m.paused);
   const gs = Object.entries(adminData.groups || {}).map(([id, g]) => ({ id, g, st: g.stat || null, ms: Object.entries(g.members || {}).map(([dev, x]) => ({ dev, ...x })).sort((a, b) => a.t - b.t) }));
   gs.sort((a, b) => ((b.st ? b.st.total : -1) - (a.st ? a.st.total : -1)) || gIdx(a.id) - gIdx(b.id));
+  $('#adProg').classList.toggle('primary', adProg);
+  if (adProg) {
+    const ph = st => !st ? 'wartet' : st.ph === 'done' ? 'Fertig' : st.ph === 'ask' ? 'Offene Fragen' : st.ph === 'finale' ? 'Abschlussquiz' : 'Aufgaben';
+    gs.sort((a, b) => gIdx(a.id) - gIdx(b.id));
+    box.innerHTML = `<div class="adprog"><table><thead><tr><th>Gruppe</th>${CH.map((c, i) => `<th>${i + 1}<small>${esc(c.name)}</small></th>`).join('')}<th>Finale</th></tr></thead><tbody>${gs.map(r => {
+      const st = r.st, md = (st && st.md) || [];
+      return `<tr><td class="gn">${esc(r.g.name || r.id)}</td>${CH.map((c, i) => md[i] ? `<td><span class="pcoin metal m-${md[i]}" title="${MEDAL[md[i]].n}">★</span><small>${MEDAL[md[i]].n}</small></td>` : `<td><span class="pcoin empty"></span></td>`).join('')}<td class="fs">${ph(st)}</td></tr>`;
+    }).join('')}</tbody></table></div>`;
+    return;
+  }
   const arm = (b, fn) => { let a = 0; b.onclick = () => { if (!a) { a = 1; const o = b.textContent; b.textContent = 'sicher?'; setTimeout(() => { a = 0; b.textContent = o; }, 3000); return; } fn(); }; };
   box.innerHTML = gs.map((r, k) => {
     const st = r.st, status = !r.g.started ? 'Wartet auf Start' : !st ? 'Spiel startet …' : st.ph === 'done' ? 'Fertig' : st.ph === 'ask' ? 'Offene Fragen' : st.ph === 'finale' ? 'Abschlussquiz' : `Aufgabe ${Math.min(5, st.done + 1)} von 5`;
