@@ -673,7 +673,7 @@
   .fqask h2 { margin: 0; } .fqask p { margin: 0; } .fqask label { font-family: var(--hand); display: block; margin: .3rem 0 .2rem; }
   .fqask textarea { width: 100%; font: inherit; font-size: 1.05rem; padding: .6rem .8rem; border: 1.6px solid var(--ink); border-radius: 10px; background: #fff9ea; color: var(--ink); resize: vertical; }
   .pdh { font-family: var(--pinyon, var(--hand)); font-size: 2.4rem; margin: 0 0 .4rem; text-align: center; color: var(--pink); } .pdnote { text-align: center; font-size: 1.05rem; margin: .8rem 0; max-width: 32rem; margin-inline: auto; }
-  .adprog { overflow-x: auto; grid-column: 1 / -1; width: 100%; } .adprog table { border-collapse: collapse; width: 100%; } .adprog th, .adprog td { padding: .45rem .5rem; text-align: center; border-bottom: 1px solid #d8c9a3; } .adprog th { font-size: .8rem; vertical-align: bottom; } .adprog th small { display: block; font-weight: 400; opacity: .7; } .adprog td.gn { text-align: left; font-weight: 800; } .adprog td small { display: block; font-size: .7rem; opacity: .75; } .adprog .fs { font-size: .85rem; } .pcoin { display: inline-block; width: 2rem; height: 2rem; line-height: 2rem; border-radius: 50%; font-size: 1.1rem; border: 2px solid rgba(0,0,0,.25); } .pcoin.empty { border: 2px dashed #bfae85; background: transparent; } .pcoin.m-gold { background: radial-gradient(circle at 35% 30%, #ffe27a, #f5c518 55%, #c49100); } .pcoin.m-silver { background: radial-gradient(circle at 35% 30%, #fff, #dfe4ea 55%, #9ea9b7); } .pcoin.m-bronze { background: radial-gradient(circle at 35% 30%, #f6bd8a, #e09a5c 55%, #a15c29); }
+  .adprog { grid-column: 1 / -1; width: 100%; display: flex; flex-direction: column; gap: .5rem; } .pgrow { border: 1.6px solid #c9b995; border-radius: 1rem; background: #fff; padding: .4rem .7rem .2rem; } .pgh { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; flex-wrap: wrap; } .pgh span { font-size: .85rem; opacity: .75; } .mtl { width: 100%; height: auto; display: block; } .mtl .pf { fill: none; stroke: #bfae85; stroke-width: 1.5; stroke-dasharray: 4 3; } .mtl .pf.m-gold { fill: #f5c518; stroke: #a37a00; stroke-dasharray: none; } .mtl .pf.m-silver { fill: #dfe4ea; stroke: #7d8896; stroke-dasharray: none; } .mtl .pf.m-bronze { fill: #e09a5c; stroke: #8c4a1c; stroke-dasharray: none; } .mtl .my { font-size: 13px; fill: #7a6745; }
   .adqs { margin: .35rem 0 0; font-size: .95rem; } .adqs ul { margin: .3rem 0 0; padding-left: 1.2rem; } .adrow { margin-top: .4rem; }
   .lzhand { position: absolute; left: 60px; bottom: 10px; width: 44px; height: 56px; pointer-events: none; z-index: 3; transform-origin: 18px 4px; }
   .lzhand svg { display: block; position: relative; z-index: 1; }
@@ -1523,12 +1523,23 @@ function renderAdminList(code) {
   gs.sort((a, b) => ((b.st ? b.st.total : -1) - (a.st ? a.st.total : -1)) || gIdx(a.id) - gIdx(b.id));
   $('#adProg').classList.toggle('primary', adProg);
   if (adProg) {
-    const ph = st => !st ? 'wartet' : st.ph === 'done' ? 'Fertig' : st.ph === 'ask' ? 'Offene Fragen' : st.ph === 'finale' ? 'Abschlussquiz' : 'Aufgaben';
+    const ph = st => !st ? 'wartet auf Start' : st.ph === 'done' ? 'Fertig' : st.ph === 'ask' ? 'Offene Fragen' : st.ph === 'finale' ? 'Abschlussquiz' : 'Zeitstrahl wächst';
     gs.sort((a, b) => gIdx(a.id) - gIdx(b.id));
-    box.innerHTML = `<div class="adprog"><table><thead><tr><th>Gruppe</th>${CH.map((c, i) => `<th>${i + 1}<small>${esc(c.name)}</small></th>`).join('')}<th>Finale</th></tr></thead><tbody>${gs.map(r => {
-      const st = r.st, md = (st && st.md) || [];
-      return `<tr><td class="gn">${esc(r.g.name || r.id)}</td>${CH.map((c, i) => md[i] ? `<td><span class="pcoin metal m-${md[i]}" title="${MEDAL[md[i]].n}">★</span><small>${MEDAL[md[i]].n}</small></td>` : `<td><span class="pcoin empty"></span></td>`).join('')}<td class="fs">${ph(st)}</td></tr>`;
-    }).join('')}</tbody></table></div>`;
+    const Y0 = 1640, Y1 = 1880, W = 1000, H = 86, ax = y => 20 + (y - Y0) / (Y1 - Y0) * (W - 40), AY = 50;
+    const medOf = {}; CH.forEach((c, i) => c.parts.forEach(id => { medOf[id] = i; }));
+    const tl = md => {
+      let o = `<svg viewBox="0 0 ${W} ${H}" class="mtl"><line x1="14" x2="${W - 14}" y1="${AY}" y2="${AY}" stroke="#8a7550" stroke-width="2"/>`;
+      PARTS.forEach(p => {
+        const m = md[medOf[p.id]] || '', cls = m ? 'pf m-' + m : 'pf';
+        if (p.type === 'ZP') { o += `<circle cx="${ax(p.year)}" cy="${AY}" r="11" class="${cls}"/><text x="${ax(p.year)}" y="${AY + 28}" text-anchor="middle" class="my">${p.year}</text>`; }
+        else (p.segs || []).forEach(([a, b, lane]) => { const h = lane === 'full' ? 22 : 11, y = lane === 'full' ? AY - 40 : lane === 'top' ? AY - 40 : AY - 28; o += `<rect x="${ax(a)}" y="${y}" width="${ax(b) - ax(a)}" height="${h - 2}" rx="4" class="${cls}"/>`; });
+      });
+      return o + '</svg>';
+    };
+    box.innerHTML = `<div class="adprog">${gs.map(r => {
+      const st = r.st, md = (st && st.md) || [], n = md.filter(Boolean).length;
+      return `<div class="pgrow"><div class="pgh"><b>${esc(r.g.name || r.id)}</b><span>${ph(st)} · ${n}/${CH.length}</span></div>${tl(md)}</div>`;
+    }).join('')}</div>`;
     return;
   }
   const arm = (b, fn) => { let a = 0; b.onclick = () => { if (!a) { a = 1; const o = b.textContent; b.textContent = 'sicher?'; setTimeout(() => { a = 0; b.textContent = o; }, 3000); return; } fn(); }; };
