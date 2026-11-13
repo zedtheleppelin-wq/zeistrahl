@@ -674,6 +674,7 @@
   .fqask textarea { width: 100%; font: inherit; font-size: 1.05rem; padding: .6rem .8rem; border: 1.6px solid var(--ink); border-radius: 10px; background: #fff9ea; color: var(--ink); resize: vertical; }
   .pdh { font-family: var(--pinyon, var(--hand)); font-size: 2.4rem; margin: 0 0 .4rem; text-align: center; color: var(--pink); } .pdnote { text-align: center; font-size: 1.05rem; margin: .8rem 0; max-width: 32rem; margin-inline: auto; }
   .adprog { grid-column: 1 / -1; width: 100%; display: flex; flex-direction: column; gap: .5rem; } .pgrow { border: 1.6px solid #c9b995; border-radius: 1rem; background: #fff; padding: .4rem .7rem .2rem; } .pgh { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; flex-wrap: wrap; } .pgh span { font-size: .85rem; opacity: .75; } .mtl { width: 100%; height: auto; display: block; } .mtl .pf { fill: none; stroke: #bfae85; stroke-width: 1.5; stroke-dasharray: 4 3; } .mtl .pf.m-gold { fill: #f5c518; stroke: #a37a00; stroke-dasharray: none; } .mtl .pf.m-silver { fill: #dfe4ea; stroke: #7d8896; stroke-dasharray: none; } .mtl .pf.m-bronze { fill: #e09a5c; stroke: #8c4a1c; stroke-dasharray: none; } .mtl .my { font-size: 13px; fill: #7a6745; }
+  body.anim #vMap, body.anim #vTime { opacity: .35; pointer-events: none; }
   .adqs { margin: .35rem 0 0; font-size: .95rem; } .adqs ul { margin: .3rem 0 0; padding-left: 1.2rem; } .adrow { margin-top: .4rem; }
   .lzhand { position: absolute; left: 60px; bottom: 10px; width: 44px; height: 56px; pointer-events: none; z-index: 3; transform-origin: 18px 4px; }
   .lzhand svg { display: block; position: relative; z-index: 1; }
@@ -1726,7 +1727,7 @@ function tapAt(e) {
   const end = () => { d = null; tlView.classList.remove('drag'); };
   tlView.addEventListener('pointerup', e => { if (d && d.m < 6) tapAt(e); end(); }); tlView.addEventListener('pointercancel', end);
   tlView.addEventListener('wheel', e => { if (busy) return; e.preventDefault(); cam.k = clamp(cam.k * (e.deltaY < 0 ? 1.12 : .89), camK() * .9, 2.2); applyCam(0); }, { passive: false });
-  $('#hub').addEventListener('pointerdown', () => { if (busy) spd = .1; });
+  $('#hub').addEventListener('pointerdown', () => { if (busy && document.body.classList.contains('dev')) spd = .1; }); // nur im Testmodus überspringbar
 })();
 
 function buildTimeline(skip = []) {
@@ -1851,13 +1852,13 @@ async function animatePlace(p, medal) {
   await sw(1500);
 }
 async function runPlacement(ids, medal) {
-  busy = true; spd = 1;
+  busy = true; spd = 1; document.body.classList.add('anim');
   try {
     setView('time'); buildTimeline(ids); await camTo(TL.W / 2, 560, camK(), 0); await sw(700);
     for (const id of ids) await animatePlace(P[id], medal);
     await camTo(pieceX(P[ids[ids.length - 1]]), 560, idleK(), 1400); await sw(400);
   } catch (e) { console.error(e); }
-  busy = false; spd = 1; renderMap(); renderChips($('#hubChips'), false);
+  busy = false; spd = 1; document.body.classList.remove('anim'); renderMap(); renderChips($('#hubChips'), false);
   if (Object.keys(S.placed).length === PARTS.length) { await wait(900); finale(); }
   else { const b = $('#vMap'); b.classList.add('primary', 'big'); b.animate([{ transform: 'scale(.6)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 500, easing: 'cubic-bezier(.3,1.6,.5,1)' }); }
 }
@@ -2015,7 +2016,7 @@ const JQ = [
 ];
 const nowAll = () => $$('#tlWorld [data-p]').filter(e => !e.classList.contains('tl-note'));
 async function finale() {
-  if (busy && !S) return; busy = true; spd = 1; if (S) { S.ph = 'finale'; statNow(); }
+  if (busy && !S) return; busy = true; spd = 1; document.body.classList.add('anim'); if (S) { S.ph = 'finale'; statNow(); }
   const hub = $('#hub'); hub.classList.add('tour');
   try {
     setView('time'); buildTimeline(); await wait(300);
@@ -2032,7 +2033,7 @@ async function finale() {
     v.classList.add('on'); await wait(1100);
     world.classList.remove('tl-all');
   } catch (e) { console.error(e); }
-  busy = false;
+  busy = false; document.body.classList.remove('anim');
   hub.classList.remove('tour');
 }
 const ease = t => { t = Math.max(0, Math.min(1, t)); return t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; };
